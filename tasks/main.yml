@@ -38,6 +38,18 @@
   run_once: true
   delegate_to: "{{ rke_node }}"
 
+- name: Replace app version
+  replace:
+    path: /tmp/rancher/chart/Chart.yaml
+    regexp: '%APP_VERSION%'
+    replace: "{{ rancherserver_version }}"
+
+- name: Replace chart version
+  replace:
+    path: /tmp/rancher/chart/Chart.yaml
+    regexp: '%VERSION%'
+    replace: "{{ rancherserver_version }}"
+
 - name: Create cattle-system namespace
   kubectl:
     kubectl_extra_args: "create namespace cattle-system"
