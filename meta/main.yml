@@ -1,0 +1,14 @@
+galaxy_info:
+  author: cainafeitosa
+  description: Ansible role that installs Rancher Server on Kubernetes
+  company: Basis Tecnologia
+  license: Apache-2.0
+  min_ansible_version: 2.9
+  galaxy_tags:
+    - Rancher
+    - Kubernetes
+
+dependencies:
+  - name: ansible_kubetools
+    src: https://github.com/BasisTI/ansible_kubetools.git
+    version: master

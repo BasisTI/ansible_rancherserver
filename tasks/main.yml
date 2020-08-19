@@ -1,0 +1,87 @@
+---
+# tasks file for rancher_server
+- name: Clone rancher repository
+  git:
+    repo: 'https://github.com/rancher/rancher.git'
+    dest: /tmp/rancher
+    version: "{{ rancherserver_version }}"
+    force: yes
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Insert nodeAffinity in chart template
+  blockinfile:
+    path: /tmp/rancher/chart/templates/deployment.yaml
+    block: |2
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: dedicated
+                        operator: In
+                        values:
+                          - rancher-server
+    insertafter: "affinity:"
+    marker: '# nodeAffinity'
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Insert tolerations in chart template
+  blockinfile:
+    path: /tmp/rancher/chart/templates/deployment.yaml
+    block: |2
+            tolerations:
+              - effect: NoSchedule
+                operator: Exists
+    insertbefore: "affinity:"
+    marker: '# tolerations'
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Create cattle-system namespace
+  kubectl:
+    kubectl_extra_args: "create namespace cattle-system"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Create cert-manager namespace
+  kubectl:
+    kubectl_extra_args: "create namespace cert-manager"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Install the CustomResourceDefinition resources separately
+  kubectl:
+    kubectl_extra_args: "apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/{{ rancherserver_certmanager_version }}/cert-manager.crds.yaml"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Add the Jetstack Helm repository
+  command: "helm repo add jetstack https://charts.jetstack.io"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Update your local Helm chart repository cache
+  command: "helm repo update"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Install the cert-manager Helm chart
+  command: "helm install cert-manager jetstack/cert-manager --namespace cert-manager --version {{ rancherserver_certmanager_version }}"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Wait for cert-manager pods
+  command: "kubectl wait --namespace cert-manager --for=condition=Ready pods --all --timeout=300s"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Install Rancher with Helm
+  command: "helm install rancher /tmp/rancher/chart/ --namespace cattle-system --set hostname={{ rancherserver_hostname }}"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
+
+- name: Wait for rancher pods
+  command: "kubectl --namespace cattle-system rollout status deploy/rancher"
+  run_once: true
+  delegate_to: "{{ rke_node }}"
