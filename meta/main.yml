@@ -28,4 +28,4 @@ galaxy_info:
         - focal
 
 dependencies:
-  - BasisTI.ansible_kubetools
+  - basisconfig.ansible_kubetools
