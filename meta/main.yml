@@ -9,6 +9,4 @@ galaxy_info:
     - Kubernetes
 
 dependencies:
-  - name: ansible_kubetools
-    src: https://github.com/BasisTI/ansible_kubetools.git
-    version: master
+  - BasisTI.ansible_kubetools
