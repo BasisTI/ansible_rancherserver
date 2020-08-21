@@ -43,12 +43,14 @@
     path: /tmp/rancher/chart/Chart.yaml
     regexp: '%APP_VERSION%'
     replace: "{{ rancherserver_version }}"
+    mode: "0644"
 
 - name: Replace chart version
   replace:
     path: /tmp/rancher/chart/Chart.yaml
     regexp: '%VERSION%'
     replace: "{{ rancherserver_version }}"
+    mode: "0644"
 
 - name: Get cattle-system namespace stat
   command: "kubectl get namespace cattle-system"
