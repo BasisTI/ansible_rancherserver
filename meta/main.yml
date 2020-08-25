@@ -1,6 +1,10 @@
 galaxy_info:
+# @meta role_name: Rancher Server 2.x
+# @meta description: An Ansible Role that installs Rancher on the Kubernetes Cluster.
+# @meta license: Apache-2.0
+  role_name: rancherserver
   author: cainafeitosa
-  description: Ansible role that installs Rancher Server on Kubernetes
+  description: An Ansible Role that installs Rancher on the Kubernetes Cluster.
   company: Basis Tecnologia
   license: Apache-2.0
   min_ansible_version: 2.9
@@ -28,4 +32,4 @@ galaxy_info:
         - focal
 
 dependencies:
-  - name: basisconfig.ansible_kubetools
+  - name: basisconfig.kubetools
