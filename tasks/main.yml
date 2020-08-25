@@ -1,17 +1,97 @@
 ---
 # tasks file for rancher_server
+- name: Install git package
+  package:
+    name: git
+    state: present
+
+- name: Install the CustomResourceDefinition resources separately
+  command: "kubectl apply --validate=false -f {{ rancherserver_crds_url }}"
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Add the Jetstack Helm repository
+  command: "helm repo add jetstack https://charts.jetstack.io"
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Update your local Helm chart repository cache
+  command: "helm repo update"
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Get cert-manager namespace stat
+  command: "kubectl get namespace cert-manager"
+  changed_when: false
+  register: cert_manager_ns_stat
+  ignore_errors: yes
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Create cert-manager namespace
+  command: "kubectl create namespace cert-manager"
+  when: "'not found' in cert_manager_ns_stat.stderr"
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Get cert-manager status
+  command: "helm status cert-manager --namespace cert-manager"
+  changed_when: false
+  register: cert_manager_release_stat
+  ignore_errors: yes
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Install the cert-manager Helm chart
+  command: "helm install cert-manager jetstack/cert-manager --namespace cert-manager --version {{ rancherserver_certmanager_version }}"
+  when: "'STATUS: deployed' not in cert_manager_release_stat.stdout"
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Wait for cert-manager pods
+  command: "kubectl wait --namespace cert-manager --for=condition=Ready pods --all --timeout=300s"
+  when: "'STATUS: deployed' not in cert_manager_release_stat.stdout"
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Get cattle-system namespace stat
+  command: "kubectl get namespace cattle-system"
+  changed_when: false
+  register: cattle_system_ns_stat
+  ignore_errors: yes
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Create cattle-system namespace
+  command: "kubectl create namespace cattle-system"
+  when: "'not found' in cattle_system_ns_stat.stderr"
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
+- name: Get rancher status
+  command: "helm status rancher --namespace cattle-system"
+  changed_when: false
+  register: rancher_release_stat
+  ignore_errors: yes
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
+
 - name: Clone rancher repository
   git:
     repo: 'https://github.com/rancher/rancher.git'
-    dest: /tmp/rancher
+    dest: ~/rancher
     version: "{{ rancherserver_version }}"
     force: yes
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Insert nodeAffinity in chart template
   blockinfile:
-    path: /tmp/rancher/chart/templates/deployment.yaml
+    path: ~/rancher/chart/templates/deployment.yaml
     block: |2
               nodeAffinity:
                 requiredDuringSchedulingIgnoredDuringExecution:
@@ -23,97 +103,51 @@
                           - rancher-server
     insertafter: "affinity:"
     marker: '# nodeAffinity'
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Insert tolerations in chart template
   blockinfile:
-    path: /tmp/rancher/chart/templates/deployment.yaml
+    path: ~/rancher/chart/templates/deployment.yaml
     block: |2
             tolerations:
               - effect: NoSchedule
                 operator: Exists
     insertbefore: "affinity:"
     marker: '# tolerations'
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Replace app version
   replace:
-    path: /tmp/rancher/chart/Chart.yaml
+    path: ~/rancher/chart/Chart.yaml
     regexp: '%APP_VERSION%'
     replace: "{{ rancherserver_version }}"
     mode: "0644"
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
+  run_once: true
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Replace chart version
   replace:
-    path: /tmp/rancher/chart/Chart.yaml
+    path: ~/rancher/chart/Chart.yaml
     regexp: '%VERSION%'
     replace: "{{ rancherserver_version }}"
     mode: "0644"
-
-- name: Get cattle-system namespace stat
-  command: "kubectl get namespace cattle-system"
-  changed_when: false
-  register: cattle_system_ns_stat
-  ignore_errors: yes
-
-- name: Get cert-manager namespace stat
-  command: "kubectl get namespace cert-manager"
-  changed_when: false
-  register: cert_manager_ns_stat
-  ignore_errors: yes
-
-- name: Create cattle-system namespace
-  command: "kubectl create namespace cattle-system"
-  when: "'not found' in cattle_system_ns_stat.stderr"
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Create cert-manager namespace
-  command: "kubectl create namespace cert-manager"
-  when: "'not found' in cert_manager_ns_stat.stderr"
-  run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Install the CustomResourceDefinition resources separately
-  command: "kubectl apply --validate=false -f {{ rancherserver_crds_url }}"
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Add the Jetstack Helm repository
-  command: "helm repo add jetstack https://charts.jetstack.io"
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Update your local Helm chart repository cache
-  command: "helm repo update"
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Install the cert-manager Helm chart
-  command: "helm install cert-manager jetstack/cert-manager --namespace cert-manager --version {{ rancherserver_certmanager_version }}"
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ rke_node }}"
-
-- name: Wait for cert-manager pods
-  command: "kubectl wait --namespace cert-manager --for=condition=Ready pods --all --timeout=300s"
-  changed_when: false
-  run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Install Rancher with Helm
-  command: "helm install rancher /tmp/rancher/chart/ --namespace cattle-system --set hostname={{ rancherserver_hostname }}"
-  changed_when: false
+  command: "helm install rancher ~/rancher/chart/ --namespace cattle-system --set hostname={{ rancherserver_hostname }}"
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Wait for rancher pods
   command: "kubectl --namespace cattle-system rollout status deploy/rancher"
-  changed_when: false
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
-  delegate_to: "{{ rke_node }}"
+  delegate_to: "{{ rke_node | default(omit) }}"
