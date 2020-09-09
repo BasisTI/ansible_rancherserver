@@ -103,7 +103,7 @@
                           - rancher-server
     insertafter: "affinity:"
     marker: '# nodeAffinity'
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout and (hostvars[item]['rke_rancher_dedicated_node'] is defined and hostvars[item]['rke_rancher_dedicated_node'])"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
@@ -116,7 +116,7 @@
                 operator: Exists
     insertbefore: "affinity:"
     marker: '# tolerations'
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
+  when: "'STATUS: deployed' not in rancher_release_stat.stdout and (hostvars[item]['rke_rancher_dedicated_node'] is defined and hostvars[item]['rke_rancher_dedicated_node'])"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
