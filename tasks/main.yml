@@ -6,7 +6,7 @@
     state: present
 
 - name: Install the CustomResourceDefinition resources separately
-  command: "kubectl apply --validate=false -f {{ rancherserver_crds_url }}"
+  command: "kubectl apply --validate=false -f {{ rancher_server_crds_url }}"
   changed_when: false
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
@@ -46,7 +46,7 @@
   delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Install the cert-manager Helm chart
-  command: "helm install cert-manager jetstack/cert-manager --namespace cert-manager --version {{ rancherserver_certmanager_version }}"
+  command: "helm install cert-manager jetstack/cert-manager --namespace cert-manager --version {{ rancher_server_certmanager_version }}"
   when: "'STATUS: deployed' not in cert_manager_release_stat.stdout"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
@@ -83,9 +83,8 @@
   git:
     repo: 'https://github.com/rancher/rancher.git'
     dest: ~/rancher
-    version: "{{ rancherserver_version }}"
+    version: "{{ rancher_server_version }}"
     force: yes
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
@@ -97,13 +96,13 @@
                 requiredDuringSchedulingIgnoredDuringExecution:
                   nodeSelectorTerms:
                   - matchExpressions:
-                      - key: dedicated
+                      - key: node-role.kubernetes.io/{{ rancher_server_node_role_name }}
                         operator: In
                         values:
-                          - rancher-server
+                          - 'true'
     insertafter: "affinity:"
-    marker: '# nodeAffinity'
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout and hostvars[item]['rke_rancher_dedicated_node'] | default('')"
+    marker: '# {mark} ANSIBLE MANAGED BLOCK nodeAffinity'
+  when: rancher_server_node_role_name in hostvars | json_query('*.rke_dedicated_node_role_name')
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
@@ -112,11 +111,12 @@
     path: ~/rancher/chart/templates/deployment.yaml
     block: |2
             tolerations:
-              - effect: NoSchedule
+              - key: node-role.kubernetes.io/{{ rancher_server_node_role_name }}
+                effect: NoSchedule
                 operator: Exists
     insertbefore: "affinity:"
-    marker: '# tolerations'
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout and hostvars[item]['rke_rancher_dedicated_node'] | default('')"
+    marker: '# {mark} ANSIBLE MANAGED BLOCK tolerations'
+  when: rancher_server_node_role_name in hostvars | json_query('*.rke_dedicated_node_role_name')
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
@@ -124,9 +124,8 @@
   replace:
     path: ~/rancher/chart/Chart.yaml
     regexp: '%APP_VERSION%'
-    replace: "{{ rancherserver_version }}"
+    replace: "{{ rancher_server_version }}"
     mode: "0644"
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
@@ -134,20 +133,19 @@
   replace:
     path: ~/rancher/chart/Chart.yaml
     regexp: '%VERSION%'
-    replace: "{{ rancherserver_version }}"
+    replace: "{{ rancher_server_version }}"
     mode: "0644"
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Install Rancher with Helm
-  command: "helm install rancher ~/rancher/chart/ --namespace cattle-system --set hostname={{ rancherserver_hostname }}"
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
+  command: "helm upgrade --install rancher ~/rancher/chart/ --namespace cattle-system --set hostname={{ rancher_server_hostname }}"
+  changed_when: no
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"
 
 - name: Wait for rancher pods
   command: "kubectl --namespace cattle-system rollout status deploy/rancher"
-  when: "'STATUS: deployed' not in rancher_release_stat.stdout"
+  changed_when: no
   run_once: true
   delegate_to: "{{ rke_node | default(omit) }}"

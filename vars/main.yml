@@ -1,2 +1,3 @@
 ---
-rancherserver_crds_url: "https://github.com/jetstack/cert-manager/releases/download/{{ rancherserver_certmanager_version }}/cert-manager.crds.yaml"
+# vars file for rancher_server
+rancher_server_crds_url: "https://github.com/jetstack/cert-manager/releases/download/{{ rancher_server_certmanager_version }}/cert-manager.crds.yaml"

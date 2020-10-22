@@ -16,7 +16,7 @@ An ansible role that installs rancher on the kubernetes cluster.
 
 
 ## License
-Apache-2.0
+Mit
 
 
 

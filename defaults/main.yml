@@ -2,7 +2,8 @@
 # defaults file for rancher_server
 # @var rancherserver_version: v2.4.5
 # Defines Rancher version will be deployed.
-rancherserver_version: v2.4.5
+rancher_server_version: v2.4.5
 # @var rancherserver_certmanager_version: v0.15.0
 # Defines cert-manager version will be deployed.
-rancherserver_certmanager_version: v0.15.0
+rancher_server_certmanager_version: v0.15.0
+rancher_server_node_role_name: rancher-server
