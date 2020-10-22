@@ -47,5 +47,4 @@ galaxy_info:
         - zesty
 
 dependencies:
-  - name: kubetools
-    src: basisconfig.kubetools
+  - name: basisconfig.kubetools
